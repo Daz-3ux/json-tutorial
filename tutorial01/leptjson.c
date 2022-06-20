@@ -17,6 +17,7 @@ static void lept_parse_whitespace(lept_context* c) {
 
 static int lept_parse_null(lept_context* c, lept_value* v) {
     EXPECT(c, 'n');
+    /* 因为在断言判断后存在'c->json++', 所以if比较爱从[0]开始 */
     if (c->json[0] != 'u' || c->json[1] != 'l' || c->json[2] != 'l')
         return LEPT_PARSE_INVALID_VALUE;
     c->json += 3;
@@ -24,24 +25,62 @@ static int lept_parse_null(lept_context* c, lept_value* v) {
     return LEPT_PARSE_OK;
 }
 
+static int lept_parse_true(lept_context *c, lept_value *v) {
+    EXPECT(c, 't');
+    if(c->json[0] != 'r' || c->json[1] != 'u' || c->json[2] != 'e'){
+        return LEPT_PARSE_INVALID_VALUE;
+    }
+    c->json += 3;
+    v->type = LEPT_TRUE;
+    return LEPT_PARSE_OK;
+}
+
+static int lept_parse_false(lept_context *c, lept_value *v) {
+    EXPECT(c, 'f');
+    if(c->json[0] != 'a' || c->json[1] != 'l' || c->json[2] != 's' || c->json[3] != 'e') {
+        return LEPT_PARSE_INVALID_VALUE;
+    }
+    c->json += 4;
+    v->type = LEPT_FALSE;
+    return LEPT_PARSE_OK;
+}
+
 static int lept_parse_value(lept_context* c, lept_value* v) {
     switch (*c->json) {
         case 'n':  return lept_parse_null(c, v);
+        case 'f':  return lept_parse_false(c, v);
+        case 't':  return lept_parse_true(c, v);
         case '\0': return LEPT_PARSE_EXPECT_VALUE;
         default:   return LEPT_PARSE_INVALID_VALUE;
     }
 }
 
 int lept_parse(lept_value* v, const char* json) {
+    /*
+    v是我实际想要比较的字符, json是标准字符
+    例如 lept_parse(&v, "null")
+    */
     lept_context c;
+    int ret;
+    /* 并不是说v的字符串常量不能是null,而是v所指向的空间不能是空 */
     assert(v != NULL);
     c.json = json;
     v->type = LEPT_NULL;
     lept_parse_whitespace(&c);
+    if((ret = lept_parse_value(&c, v)) == LEPT_PARSE_OK){
+        lept_parse_whitespace(&c);
+        if(*c.json != '\0'){
+            ret = LEPT_PARSE_ROOT_NOT_SINGULAR;
+        }
+    }
+/*
     return lept_parse_value(&c, v);
+*/
+    return ret;
 }
 
 lept_type lept_get_type(const lept_value* v) {
     assert(v != NULL);
+    /* v的type 在 lept_parse()调用中指定 */
     return v->type;
 }
